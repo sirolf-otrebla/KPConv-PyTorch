@@ -1442,7 +1442,7 @@ def debug_class_w(dataset, loader):
             # print(batch_i, tuple(points.shape),  tuple(normals.shape), labels, indices, in_sizes)
 
             # count labels
-            new_counts = np.bincount(batch.labels)
+            new_counts = np.bincount(batch.input_labels)
 
             counts[:new_counts.shape[0]] += new_counts.astype(np.int64)
 

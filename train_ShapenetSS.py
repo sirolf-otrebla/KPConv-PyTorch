@@ -32,6 +32,7 @@ import torch
 from datasets.ModelNet40 import *
 from torch.utils.data import DataLoader
 
+from datasets.ShapeNet import ShapeNetSSDataset, ShapeNetSSCollate, ShapeNetSSSampler
 from utils.config import Config
 from utils.trainer import ModelTrainer
 from models.architectures import KPCNN
@@ -93,7 +94,7 @@ class Modelnet40Config(Config):
     num_kernel_points = 15
 
     # Size of the first subsampling grid in meter
-    first_subsampling_dl = 0.05
+    first_subsampling_dl = 0.02
 
     # Radius of convolution in "number grid cell". (2.5 is the standard value)
     conv_radius = 2.5
@@ -142,13 +143,13 @@ class Modelnet40Config(Config):
     grad_clip_norm = 100.0
 
     # Number of batch
-    batch_num = 4
+    batch_num = 6
 
     # Number of steps per epochs
-    epoch_steps = 300
+    epoch_steps = 100
 
     # Number of validation examples per epoch
-    validation_size = 30
+    validation_size = 300000000000000
 
     # Number of epoch between each checkpoint
     checkpoint_gap = 50
@@ -181,7 +182,6 @@ class Modelnet40Config(Config):
 
 if __name__ == '__main__':
 
-    print(torch.cuda.is_available())
     ############################
     # Initialize the environment
     ############################
@@ -237,30 +237,22 @@ if __name__ == '__main__':
         config.saving_path = sys.argv[1]
 
     # Initialize datasets
-    training_dataset = ModelNet40Dataset(config, train=True)
-    test_dataset = ModelNet40Dataset(config, train=False)
+    training_dataset = ShapeNetSSDataset(config, train=True)
+    test_dataset = ShapeNetSSDataset(config, train=False)
 
-    # Initialize samplers
-    training_sampler = ModelNet40Sampler(training_dataset, balance_labels=True)
-    test_sampler = ModelNet40Sampler(test_dataset, balance_labels=True)
+    training_sampler = ShapeNetSSSampler(training_dataset, balance_labels=False)
+    test_sampler = ShapeNetSSSampler(test_dataset, balance_labels=False)
+
 
     # Initialize the dataloader
     training_loader = DataLoader(training_dataset,
-                                 batch_size=1,
                                  sampler=training_sampler,
-                                 collate_fn=ModelNet40Collate,
-                                 num_workers=config.input_threads,
-                                 pin_memory=True)
+                                 batch_size=1,
+                                 collate_fn=ShapeNetSSCollate)
     test_loader = DataLoader(test_dataset,
-                             batch_size=1,
                              sampler=test_sampler,
-                             collate_fn=ModelNet40Collate,
-                             num_workers=config.input_threads,
-                             pin_memory=True)
-
-    # Calibrate samplers
-    training_sampler.calibration(training_loader)
-    test_sampler.calibration(test_loader)
+                             batch_size=1,
+                             collate_fn=ShapeNetSSCollate)
 
     #debug_timing(test_dataset, test_sampler, test_loader)
     #debug_show_clouds(training_dataset, training_sampler, training_loader)
@@ -280,12 +272,15 @@ if __name__ == '__main__':
     print('**************')
 
     # Training
-    try:
-        trainer.train(net, training_loader, test_loader, config)
-    except:
-        print('Caught an error')
-        os.kill(os.getpid(), signal.SIGINT)
-
+    trainer.train(net, training_loader, test_loader, config)
+    """
+        try:
+            trainer.train(net, training_loader, test_loader, config)
+        except :
+            print()
+            print('Caught an error')
+            os.kill(os.getpid(), signal.SIGINT)
+    """
     print('Forcing exit now')
     os.kill(os.getpid(), signal.SIGINT)
 

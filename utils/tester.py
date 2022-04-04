@@ -128,7 +128,7 @@ class ModelTester:
 
                 # Get probs and labels
                 probs += [softmax(outputs).cpu().detach().numpy()]
-                targets += [batch.labels.cpu().numpy()]
+                targets += [batch.input_labels.cpu().numpy()]
                 obj_inds += [batch.model_inds.cpu().numpy()]
 
                 if 'cuda' in self.device.type:

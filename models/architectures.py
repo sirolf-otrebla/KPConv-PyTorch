@@ -185,7 +185,6 @@ class KPCNN(nn.Module):
 
         return correct / total
 
-
 class KPFCNN(nn.Module):
     """
     Class defining KPFCNN

@@ -42,7 +42,8 @@ from utils.config import Config
 from sklearn.neighbors import KDTree
 
 from models.blocks import KPConv
-
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -186,8 +187,8 @@ class ModelTrainer:
 
                 # Forward pass
                 outputs = net(batch, config)
-                loss = net.loss(outputs, batch.labels)
-                acc = net.accuracy(outputs, batch.labels)
+                loss = net.loss(outputs, batch.input_labels)
+                acc = net.accuracy(outputs, batch.input_labels)
 
                 t += [time.time()]
 
@@ -290,8 +291,149 @@ class ModelTrainer:
             self.cloud_segmentation_validation(net, val_loader, config)
         elif config.dataset_task == 'slam_segmentation':
             self.slam_segmentation_validation(net, val_loader, config)
+        elif config.dataset_task == 'SS_anomaly_detection':
+            self.SS_anomaly_detection_validation(net, val_loader, config)
+
         else:
             raise ValueError('No validation method implemented for this network type')
+
+    def SS_anomaly_detection_validation(self, net, val_loader, config):
+        """
+        Perform a round of validation and show/save results
+        :param net: network object
+        :param val_loader: data loader for validation set
+        :param config: configuration object
+        """
+
+        ############
+        # Initialize
+        ############
+
+        def normality_score(O):
+            # [N, N_T, N_T]
+            diags = torch.diagonal(O, offset=0, dim1=1, dim2=2)
+            means = torch.mean(diags, 1)
+            return means
+
+        anomaly_scores = np.zeros((val_loader.dataset.data.shape[0]), dtype=float)
+        # Choose validation smoothing parameter (0 for no smothing, 0.99 for big smoothing)
+        val_smooth = 0.95
+
+        # Number of classes predicted by the model
+        nc_model = config.num_classes
+        softmax = torch.nn.Softmax(1)
+
+        # Initialize global prediction over all models
+        if not hasattr(self, 'val_probs'):
+            self.val_probs = np.zeros((val_loader.dataset.num_models, nc_model))
+
+        #####################
+        # Network predictions
+        #####################
+
+        probs = []
+        targets = []
+        obj_inds = []
+
+        t = [time.time()]
+        last_display = time.time()
+        mean_dt = np.zeros(1)
+
+        N_LABELS = val_loader.dataset.num_classes
+        # Start validation loop
+        for batch in val_loader:
+
+            # New time
+            t = t[-1:]
+            t += [time.time()]
+
+            if 'cuda' in self.device.type:
+                batch.to(self.device)
+
+            # Forward pass
+            outputs = net(batch, config)
+
+            # Get probs and labels
+
+            ss_outputs = softmax(outputs).view(-1, N_LABELS, N_LABELS)
+            batch_scores = - normality_score(ss_outputs)
+            for i in range(0, batch.model_inds.size(0), N_LABELS):
+                anomaly_scores[batch.model_inds[i]] += batch_scores[ i // N_LABELS ]
+
+            probs += [softmax(outputs).cpu().detach().numpy()]
+
+            targets += [batch.input_labels.cpu().numpy()]
+            obj_inds += [batch.model_inds.cpu().numpy()]
+            torch.cuda.synchronize(self.device)
+
+            # Average timing
+            t += [time.time()]
+            mean_dt = 0.95 * mean_dt + 0.05 * (np.array(t[1:]) - np.array(t[:-1]))
+
+            # Display
+            if (t[-1] - last_display) > 1.0:
+                last_display = t[-1]
+                message = 'Validation : {:.1f}% (timings : {:4.2f} {:4.2f})'
+                print(message.format(100 * len(obj_inds) / config.validation_size,
+                                     1000 * (mean_dt[0]),
+                                     1000 * (mean_dt[1])))
+
+        # Stack all validation predictions
+        probs = np.vstack(probs)
+        targets = np.hstack(targets)
+        obj_inds = np.hstack(obj_inds)
+
+        ###################
+        # Voting validation
+        ###################
+
+        self.val_probs[obj_inds] = val_smooth * self.val_probs[obj_inds] + (1-val_smooth) * probs
+
+        ############
+        # Confusions
+        ############
+
+        validation_labels = np.array(val_loader.dataset.label_values)
+
+        # Compute classification results
+        C1 = fast_confusion(targets,
+                            np.argmax(probs, axis=1),
+                            validation_labels)
+
+        # Compute votes confusion
+        C2 = fast_confusion(val_loader.dataset.input_labels,
+                            np.argmax(self.val_probs, axis=1),
+                            validation_labels)
+
+
+        # Saving (optionnal)
+        if config.saving:
+            print("Save confusions")
+            conf_list = [C1, C2]
+            file_list = ['val_confs.txt', 'vote_confs.txt']
+            for conf, conf_file in zip(conf_list, file_list):
+                test_file = join(config.saving_path, conf_file)
+                if exists(test_file):
+                    with open(test_file, "a") as text_file:
+                        for line in conf:
+                            for value in line:
+                                text_file.write('%d ' % value)
+                        text_file.write('\n')
+                else:
+                    with open(test_file, "w") as text_file:
+                        for line in conf:
+                            for value in line:
+                                text_file.write('%d ' % value)
+                        text_file.write('\n')
+
+        val_ACC = 100 * np.sum(np.diag(C1)) / (np.sum(C1) + 1e-6)
+        vote_ACC = 100 * np.sum(np.diag(C2)) / (np.sum(C2) + 1e-6)
+        print('Accuracies : val = {:.1f}% / vote = {:.1f}%'.format(val_ACC, vote_ACC))
+        auc = "{:.4f}".format(roc_auc_score(val_loader.dataset.input_labels, anomaly_scores))
+        print("Predictions", "AUC", auc)
+
+
+        return C1
 
     def object_classification_validation(self, net, val_loader, config):
         """
@@ -343,7 +485,7 @@ class ModelTrainer:
 
             # Get probs and labels
             probs += [softmax(outputs).cpu().detach().numpy()]
-            targets += [batch.labels.cpu().numpy()]
+            targets += [batch.input_labels.cpu().numpy()]
             obj_inds += [batch.model_inds.cpu().numpy()]
             torch.cuda.synchronize(self.device)
 
@@ -482,7 +624,7 @@ class ModelTrainer:
 
             # Get probs and labels
             stacked_probs = softmax(outputs).cpu().detach().numpy()
-            labels = batch.labels.cpu().numpy()
+            labels = batch.input_labels.cpu().numpy()
             lengths = batch.lengths[0].cpu().numpy()
             in_inds = batch.input_inds.cpu().numpy()
             cloud_inds = batch.cloud_inds.cpu().numpy()

@@ -110,7 +110,7 @@ class ModelNet40Dataset(PointCloudDataset):
         self.ignored_labels = np.array([])
 
         # Dataset folder
-        self.path = '../../Data/ModelNet40'
+        self.path = './data/ModelNet40'
 
         # Type of task conducted on this dataset
         self.dataset_task = 'classification'
@@ -580,7 +580,7 @@ class ModelNet40Sampler(Sampler):
                     neighb_hists += np.vstack(hists)
 
                     # batch length
-                    b = len(batch.labels)
+                    b = len(batch.input_labels)
 
                     # Update estim_b (low pass filter)
                     estim_b += (b - estim_b) / low_pass_T
@@ -852,7 +852,7 @@ def debug_timing(dataset, sampler, loader):
             t += [time.time()]
 
             # Update estim_b (low pass filter)
-            estim_b += (len(batch.labels) - estim_b) / 100
+            estim_b += (len(batch.input_labels) - estim_b) / 100
 
             # Pause simulating computations
             time.sleep(0.050)
@@ -905,7 +905,7 @@ def debug_show_clouds(dataset, sampler, loader):
             print('\nFeatures')
             print(batch.features.dtype, batch.features.shape)
             print('\nLabels')
-            print(batch.labels.dtype, batch.labels.shape)
+            print(batch.input_labels.dtype, batch.input_labels.shape)
             print('\nAugment Scales')
             print(batch.scales.dtype, batch.scales.shape)
             print('\nAugment Rotations')
@@ -918,7 +918,7 @@ def debug_show_clouds(dataset, sampler, loader):
             print(batch.neighbors[-1].is_pinned())
             print(batch.points[0].is_pinned())
             print(batch.points[-1].is_pinned())
-            print(batch.labels.is_pinned())
+            print(batch.input_labels.is_pinned())
             print(batch.scales.is_pinned())
             print(batch.rots.is_pinned())
             print(batch.model_inds.is_pinned())
