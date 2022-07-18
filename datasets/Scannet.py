@@ -63,9 +63,27 @@ class ModelNet40Dataset(PointCloudDataset):
         ############
 
         # Dict from labels to names
-        self.label_to_names = {}
-        for i in range(55):
-            self.label_to_names[i] = i
+        self.label_to_names = {0: 'backpack',
+                               1: 'bed',
+                               2: 'book',
+                               3: 'bookshelf',
+                               4: 'box',
+                               5: 'cabinet',
+                               6: 'chair',
+                               7: 'desk',
+                               8: 'lamp',
+                               9: 'monitor',
+                               10: 'picture',
+                               11: 'pillow',
+                               12: 'sink',
+                               13: 'sofa',
+                               14: 'table',
+                               15: 'towel',
+                               16: 'trash_can'
+                              }
+        #self.label_to_names = {}
+        #for i in range(55):
+        #     self.label_to_names[i] = i
 
         print(self.label_to_names)
         # Initialize a bunch of variables concerning class labels
@@ -75,7 +93,7 @@ class ModelNet40Dataset(PointCloudDataset):
         self.ignored_labels = np.array([])
 
         # Dataset folder
-        self.path = './data/shapenetcorev2_hdf5_2048'
+        self.path = './data/scannet_more'
 
         # Type of task conducted on this dataset
         self.dataset_task = 'classification'

@@ -32,7 +32,7 @@ import torch
 from datasets.ModelNet40 import *
 from torch.utils.data import DataLoader
 
-from datasets.ShapeNet import ShapeNetSSDataset, ShapeNetSSCollate, ShapeNetSSSampler
+from datasets.SelfSupervisedADShapeNet import ShapeNetSSDataset, ShapeNetSSCollate, ShapeNetSSSampler
 from utils.config import Config
 from utils.trainer import ModelTrainer
 from models.architectures import KPCNN

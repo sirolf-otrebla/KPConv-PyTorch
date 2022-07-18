@@ -187,8 +187,12 @@ class ModelTrainer:
 
                 # Forward pass
                 outputs = net(batch, config)
-                loss = net.loss(outputs, batch.input_labels)
-                acc = net.accuracy(outputs, batch.input_labels)
+
+                loss = net.loss(outputs, batch.labels)
+                acc = net.accuracy(outputs, batch.labels)
+                # SELF SUPERVISED STUFF
+                #loss = net.loss(outputs, batch.input_labels)
+                #acc = net.accuracy(outputs, batch.input_labels)
 
                 t += [time.time()]
 
@@ -362,8 +366,8 @@ class ModelTrainer:
 
             probs += [softmax(outputs).cpu().detach().numpy()]
 
-            targets += [batch.input_labels.cpu().numpy()]
-            obj_inds += [batch.model_inds.cpu().numpy()]
+            targets += [batch.labels.cpu().numpy()]
+            obj_inds += [batch.labels.cpu().numpy()]
             torch.cuda.synchronize(self.device)
 
             # Average timing
@@ -485,8 +489,12 @@ class ModelTrainer:
 
             # Get probs and labels
             probs += [softmax(outputs).cpu().detach().numpy()]
-            targets += [batch.input_labels.cpu().numpy()]
-            obj_inds += [batch.model_inds.cpu().numpy()]
+            targets += [batch.labels.cpu().numpy()]
+            obj_inds += [batch.labels.cpu().numpy()]
+            # OLD SS CRAP
+            #targets += [batch.input_labels.cpu().numpy()]
+            #obj_inds += [batch.model_inds.cpu().numpy()]
+
             torch.cuda.synchronize(self.device)
 
             # Average timing

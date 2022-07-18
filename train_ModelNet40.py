@@ -29,12 +29,12 @@ import sys
 import torch
 
 # Dataset
-from datasets.ModelNet40 import *
+from datasets.ShapeNet import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
 from utils.trainer import ModelTrainer
-from models.architectures import KPCNN
+from models.simple_architecture import KPCNN
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -280,11 +280,7 @@ if __name__ == '__main__':
     print('**************')
 
     # Training
-    try:
-        trainer.train(net, training_loader, test_loader, config)
-    except:
-        print('Caught an error')
-        os.kill(os.getpid(), signal.SIGINT)
+    trainer.train(net, training_loader, test_loader, config)
 
     print('Forcing exit now')
     os.kill(os.getpid(), signal.SIGINT)
